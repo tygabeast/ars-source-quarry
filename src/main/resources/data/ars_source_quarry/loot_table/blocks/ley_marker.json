@@ -1,0 +1,21 @@
+{
+  "type": "minecraft:block",
+  "random_sequence": "ars_source_quarry:blocks/ley_marker",
+  "pools": [
+    {
+      "rolls": 1,
+      "bonus_rolls": 0,
+      "entries": [
+        {
+          "type": "minecraft:item",
+          "name": "ars_source_quarry:ley_marker"
+        }
+      ],
+      "conditions": [
+        {
+          "condition": "minecraft:survives_explosion"
+        }
+      ]
+    }
+  ]
+}

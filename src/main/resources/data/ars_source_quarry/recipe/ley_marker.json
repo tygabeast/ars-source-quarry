@@ -1,0 +1,24 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [
+    "g",
+    "r",
+    "s"
+  ],
+  "key": {
+    "g": {
+      "tag": "c:gems/source"
+    },
+    "r": {
+      "tag": "c:ingots/gold"
+    },
+    "s": {
+      "item": "ars_nouveau:sourcestone"
+    }
+  },
+  "result": {
+    "id": "ars_source_quarry:ley_marker",
+    "count": 2
+  }
+}

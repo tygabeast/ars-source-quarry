@@ -1,0 +1,19 @@
+{
+  "variants": {
+    "facing=north": {
+      "model": "ars_source_quarry:block/source_quarry"
+    },
+    "facing=east": {
+      "model": "ars_source_quarry:block/source_quarry",
+      "y": 90
+    },
+    "facing=south": {
+      "model": "ars_source_quarry:block/source_quarry",
+      "y": 180
+    },
+    "facing=west": {
+      "model": "ars_source_quarry:block/source_quarry",
+      "y": 270
+    }
+  }
+}

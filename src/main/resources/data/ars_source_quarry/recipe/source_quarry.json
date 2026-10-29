@@ -1,0 +1,38 @@
+{
+  "type": "ars_nouveau:enchanting_apparatus",
+  "keepNbtOfReagent": false,
+  "reagent": {
+    "item": "minecraft:diamond_pickaxe"
+  },
+  "pedestalItems": [
+    {
+      "tag": "c:gems/source"
+    },
+    {
+      "tag": "c:gems/source"
+    },
+    {
+      "tag": "c:gems/source"
+    },
+    {
+      "tag": "c:gems/source"
+    },
+    {
+      "item": "ars_nouveau:sourcestone"
+    },
+    {
+      "item": "ars_nouveau:sourcestone"
+    },
+    {
+      "tag": "c:obsidians"
+    },
+    {
+      "tag": "c:obsidians"
+    }
+  ],
+  "result": {
+    "id": "ars_source_quarry:source_quarry",
+    "count": 1
+  },
+  "sourceCost": 1000
+}

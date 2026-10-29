@@ -1,0 +1,86 @@
+buildscript {
+    repositories {
+        gradlePluginPortal()
+        maven { url = 'https://maven.neoforged.net/releases' }
+    }
+    dependencies {
+        classpath('net.neoforged:moddev-gradle:2.0.148') {
+            exclude group: 'gradle.plugin.org.jetbrains.gradle.plugin.idea-ext'
+        }
+    }
+}
+
+apply plugin: 'java-library'
+apply plugin: 'net.neoforged.moddev'
+
+version = mod_version
+group = 'com.tygabeast.arssourcequarry'
+
+base {
+    archivesName = 'ars_source_quarry-1.21.1'
+}
+
+java.toolchain.languageVersion = JavaLanguageVersion.of(21)
+
+repositories {
+    mavenCentral()
+    maven { url = 'https://maven.blamejared.com' }          // Ars Nouveau
+    maven { url = 'https://maven.theillusivec4.top/' }      // Curios
+    maven { url = 'https://dl.cloudsmith.io/public/geckolib3/geckolib/maven/' } // GeckoLib
+    maven { url = 'https://api.modrinth.com/maven' }                            // Jade (optional)
+}
+
+neoForge {
+    version = neo_version
+
+    runs {
+        server {
+            server()
+            programArgument '--nogui'
+        }
+    }
+
+    mods {
+        ars_source_quarry {
+            sourceSet sourceSets.main
+        }
+    }
+}
+
+// Ars Nouveau is compiled against its official Maven artifact. A local copy in libs/
+// (used when that Maven is unreachable) takes priority; libs/ is never published.
+def localArs = fileTree('libs') { include 'ars_nouveau-*.jar' }
+def localJade = fileTree('libs') { include 'Jade-*.jar' }
+
+dependencies {
+    if (!localArs.isEmpty()) {
+        implementation files(localArs.files)
+        runtimeOnly files(fileTree('libs') { include 'curios-*.jar', 'geckolib-*.jar' }.files)
+    } else {
+        implementation "com.hollingsworth.ars_nouveau:ars_nouveau-1.21.1:${ars_version}"
+    }
+    // Jade is optional: compiled against, never bundled.
+    if (!localJade.isEmpty()) {
+        compileOnly files(localJade.files)
+        // -PnoJade runs the dev server without Jade, to check the mod works when Jade is absent
+        if (!project.hasProperty('noJade')) runtimeOnly files(localJade.files)
+    } else {
+        compileOnly "maven.modrinth:jade:${jade_version}"
+    }
+}
+
+tasks.withType(ProcessResources).configureEach {
+    var props = [mod_version: mod_version, ars_range: ars_range, neo_range: neo_range]
+    inputs.properties props
+    filesMatching('META-INF/neoforge.mods.toml') { expand props }
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+    options.release = 21
+}
+
+jar {
+    from('README.md')
+    from('LICENSE')
+}

@@ -1,0 +1,42 @@
+modLoader = "javafml"
+loaderVersion = "[1,)"
+license = "MIT"
+
+[[mods]]
+modId = "ars_source_quarry"
+version = "${mod_version}"
+displayName = "Ars Source Quarry"
+authors = "Tygabeast"
+description = '''
+A Source-powered quarry for Ars Nouveau. Mark out a box with two Corner Ley Markers and a Depth Ley Marker,
+and the quarry mines it out layer by layer, sending items and fluids into neighbouring containers.
+'''
+logoFile = "ars_source_quarry.png"
+
+[[dependencies.ars_source_quarry]]
+modId = "neoforge"
+type = "required"
+versionRange = "${neo_range}"
+ordering = "NONE"
+side = "BOTH"
+
+[[dependencies.ars_source_quarry]]
+modId = "minecraft"
+type = "required"
+versionRange = "[1.21.1,1.21.2)"
+ordering = "NONE"
+side = "BOTH"
+
+[[dependencies.ars_source_quarry]]
+modId = "jade"
+type = "optional"
+versionRange = "[15,)"
+ordering = "NONE"
+side = "BOTH"
+
+[[dependencies.ars_source_quarry]]
+modId = "ars_nouveau"
+type = "required"
+versionRange = "${ars_range}"
+ordering = "AFTER"
+side = "BOTH"
