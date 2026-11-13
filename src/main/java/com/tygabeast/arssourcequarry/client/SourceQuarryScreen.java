@@ -31,9 +31,9 @@ public class SourceQuarryScreen extends AbstractContainerScreen<SourceQuarryMenu
     // Layout (relative to the screen's top-left), shared with tools/gui_texture.py
     private static final int UP_MINUS_X = 40, UP_PLUS_X = 80, UP_Y = 52, DOWN_Y = 65, BEDROCK_X = 96;
     private static final int APPLY_X = 10, APPLY_Y = 80, APPLY_W = 100, APPLY_H = 14;
-    private static final int LOCK_X = 176, REDSTONE_X = 198, OUTLINE_X = 220, ICON_Y = 103;
+    private static final int START_X = 154, LOCK_X = 176, REDSTONE_X = 198, OUTLINE_X = 220, ICON_Y = 103;
     private static final int VOID_MODE_X = 214, VOID_TAGS_X = 228, VOID_BTN_Y = 60;
-    private static final int BAR_X = 10, PROGRESS_Y = 112, SOURCE_Y = 121, BAR_W = 130, BAR_H = 5;
+    private static final int BAR_X = 10, PROGRESS_Y = 112, SOURCE_Y = 121, BAR_W = 108, BAR_H = 5;
 
     public SourceQuarryScreen(SourceQuarryMenu menu, Inventory inv, Component title) {
         super(menu, inv, title);
@@ -99,6 +99,10 @@ public class SourceQuarryScreen extends AbstractContainerScreen<SourceQuarryMenu
         smallButton(g, x + VOID_TAGS_X, y + VOID_BTN_Y, mouseX, mouseY, true);
 
         // Icon buttons: lock, redstone mode and outline
+        // Start / Stop: shows what pressing it will do
+        boolean started = v(QuarryData.STARTED) != 0;
+        g.blit(TEX, x + START_X, y + ICON_Y, in(mouseX, mouseY, x + START_X, y + ICON_Y, 18, 18) ? 160 : 142, 238, 18, 18);
+        g.blit(TEX, x + START_X + 5, y + ICON_Y + 5, started ? 210 : 200, 240, 8, 8);
         iconButton(g, x + LOCK_X, y + ICON_Y, mouseX, mouseY,
                 new ItemStack(v(QuarryData.LOCKED) != 0 ? Items.IRON_DOOR : Items.OAK_DOOR));
         iconButton(g, x + REDSTONE_X, y + ICON_Y, mouseX, mouseY, redstoneIcon(v(QuarryData.REDSTONE)));
@@ -120,7 +124,6 @@ public class SourceQuarryScreen extends AbstractContainerScreen<SourceQuarryMenu
         return new ItemStack(switch (mode) {
             case 1 -> Items.REDSTONE_TORCH;
             case 2 -> Items.LEVER;
-            case 3 -> Items.BARRIER;
             default -> Items.GUNPOWDER;
         });
     }
@@ -191,6 +194,11 @@ public class SourceQuarryScreen extends AbstractContainerScreen<SourceQuarryMenu
             int est = v(QuarryData.ESTIMATE);
             if (est > 0) tip.add(Component.translatable("gui.ars_source_quarry.tip.estimate", est).withStyle(ChatFormatting.GRAY));
             if (v(QuarryData.CHUNK_LOADED) != 0) tip.add(Component.translatable("gui.ars_source_quarry.tip.chunk_loaded").withStyle(ChatFormatting.GRAY));
+        } else if (in(mx, my, x + START_X, y + ICON_Y, 18, 18)) {
+            boolean started = v(QuarryData.STARTED) != 0;
+            tip.add(Component.translatable(started ? "gui.ars_source_quarry.tip.stop" : "gui.ars_source_quarry.tip.start"));
+            tip.add(Component.translatable(started ? "gui.ars_source_quarry.tip.stop_desc"
+                    : "gui.ars_source_quarry.tip.start_desc").withStyle(ChatFormatting.GRAY));
         } else if (in(mx, my, x + LOCK_X, y + ICON_Y, 18, 18)) {
             boolean locked = v(QuarryData.LOCKED) != 0;
             tip.add(Component.translatable(locked ? "gui.ars_source_quarry.tip.locked" : "gui.ars_source_quarry.tip.unlocked"));
@@ -206,7 +214,7 @@ public class SourceQuarryScreen extends AbstractContainerScreen<SourceQuarryMenu
         } else if (in(mx, my, x + REDSTONE_X, y + ICON_Y, 18, 18)) {
             int m = v(QuarryData.REDSTONE);
             SourceQuarryBlockEntity.RedstoneMode[] modes = SourceQuarryBlockEntity.RedstoneMode.values();
-            tip.add(Component.translatable(modes[Math.max(0, Math.min(3, m))].key()));
+            tip.add(Component.translatable(modes[Math.max(0, Math.min(modes.length - 1, m))].key()));
             tip.add(Component.translatable("gui.ars_source_quarry.tip.cycle").withStyle(ChatFormatting.GRAY));
         } else if (in(mx, my, x + OUTLINE_X, y + ICON_Y, 18, 18)) {
             tip.add(Component.translatable(v(QuarryData.OUTLINE) != 0 ? "gui.ars_source_quarry.tip.outline_on"
@@ -258,6 +266,7 @@ public class SourceQuarryScreen extends AbstractContainerScreen<SourceQuarryMenu
             else if (in(mouseX, mouseY, x + REDSTONE_X, y + ICON_Y, 18, 18))
                 id = button == 1 ? QuarryData.B_REDSTONE_BACK : QuarryData.B_REDSTONE;
             else if (in(mouseX, mouseY, x + OUTLINE_X, y + ICON_Y, 18, 18)) id = QuarryData.B_OUTLINE;
+            else if (in(mouseX, mouseY, x + START_X, y + ICON_Y, 18, 18)) id = QuarryData.B_START;
             else if (in(mouseX, mouseY, x + LOCK_X, y + ICON_Y, 18, 18) && v(QuarryData.CAN_LOCK) != 0) id = QuarryData.B_LOCK;
             else if (in(mouseX, mouseY, x + VOID_MODE_X, y + VOID_BTN_Y, 12, 12)) id = QuarryData.B_VOID_MODE;
             else if (in(mouseX, mouseY, x + VOID_TAGS_X, y + VOID_BTN_Y, 12, 12)) id = QuarryData.B_VOID_TAGS;

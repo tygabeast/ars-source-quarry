@@ -30,10 +30,6 @@ public final class QuarryGlyphs {
         return items[slot];
     }
 
-    public static int maxStack(int slot) {
-        return MAX[slot];
-    }
-
     /** Item handler for the glyph slots: each slot takes only its glyph; Extract and Fortune exclude each other. */
     public static class Handler extends ItemStackHandler {
         private final Runnable onChange;

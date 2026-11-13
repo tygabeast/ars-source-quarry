@@ -97,14 +97,14 @@ public class SourceQuarryBlockEntity extends BlockEntity implements MenuProvider
     public static final int DEFAULT_DOWN = 8;
 
     public enum Status {
-        NOT_LINKED, RUNNING, NO_SOURCE, NO_OUTPUT, OUTPUT_FULL, WAITING_REDSTONE, DISABLED, PLAYER_IN_AREA,
-        WAITING_CHUNK, FINISHING, DONE;
+        NOT_LINKED, RUNNING, NO_SOURCE, NO_OUTPUT, OUTPUT_FULL, WAITING_REDSTONE, STOPPED, MARKER_MOVED,
+        PLAYER_IN_AREA, WAITING_CHUNK, FINISHING, DONE;
         public String key() { return "status.ars_source_quarry." + name().toLowerCase(); }
     }
 
-    /** ALWAYS runs; HIGH needs a signal; LOW needs no signal; OFF never runs. */
+    /** ALWAYS ignores redstone; HIGH needs a signal; LOW needs no signal. Stopping is the Start/Stop button. */
     public enum RedstoneMode {
-        ALWAYS, HIGH, LOW, OFF;
+        ALWAYS, HIGH, LOW;
         public String key() { return "redstone.ars_source_quarry." + name().toLowerCase(); }
     }
 
@@ -119,6 +119,10 @@ public class SourceQuarryBlockEntity extends BlockEntity implements MenuProvider
     private @Nullable BlockPos markerA, markerB;
     private int up, down = DEFAULT_DOWN, appliedUp, appliedDown;
     private RedstoneMode redstoneMode = RedstoneMode.ALWAYS;
+    /** Start/Stop. A freshly placed quarry starts stopped; quarries saved before 1.4.0 load running. */
+    private boolean started;
+    /** One of the two linked markers is gone or no longer paired; mining waits until a pair is found again. */
+    private boolean markerMissing;
     private boolean outline;
     private @Nullable UUID owner;
     private String ownerName = "";
@@ -157,7 +161,7 @@ public class SourceQuarryBlockEntity extends BlockEntity implements MenuProvider
     private @Nullable Set<TagKey<Item>> voidTagSet;
     private boolean forcedQuarryChunk;
     private long forcedAreaChunk = Long.MIN_VALUE;
-    private long nextUpkeep, nextRunningSync;
+    private long nextUpkeep, nextRunningSync, nextMarkerCheck;
     private boolean syncedRunning;
     private final SourceCap sourceCap = new SourceCap();
     private int amplify = -1, extraCost;
@@ -218,6 +222,7 @@ public class SourceQuarryBlockEntity extends BlockEntity implements MenuProvider
         mined = 0;
         spent = 0;
         skipped = 0;
+        markerMissing = false;
         linked = true;
         status = Status.RUNNING;
         setChanged();
@@ -327,7 +332,7 @@ public class SourceQuarryBlockEntity extends BlockEntity implements MenuProvider
 
     /** What Apply would do right now. */
     private int applyKind() {
-        if (!linked) return QuarryData.APPLY_RESTART;
+        if (!linked || markerMissing) return QuarryData.APPLY_RESTART;
         if (up == appliedUp && down == appliedDown) return QuarryData.APPLY_NONE;
         if (up == appliedUp && down > appliedDown) return QuarryData.APPLY_EXTEND;
         return QuarryData.APPLY_RESTART;
@@ -367,8 +372,12 @@ public class SourceQuarryBlockEntity extends BlockEntity implements MenuProvider
             case QuarryData.B_DOWN_PLUS10 -> down = Math.min(maxDown, down + 10);
             case QuarryData.B_BEDROCK -> down = maxDown;
             case QuarryData.B_APPLY -> apply(player);
-            case QuarryData.B_REDSTONE -> redstoneMode = RedstoneMode.values()[(redstoneMode.ordinal() + 1) % 4];
-            case QuarryData.B_REDSTONE_BACK -> redstoneMode = RedstoneMode.values()[(redstoneMode.ordinal() + 3) % 4];
+            case QuarryData.B_REDSTONE -> redstoneMode = RedstoneMode.values()[(redstoneMode.ordinal() + 1) % 3];
+            case QuarryData.B_REDSTONE_BACK -> redstoneMode = RedstoneMode.values()[(redstoneMode.ordinal() + 2) % 3];
+            case QuarryData.B_START -> {
+                started = !started;
+                cooldown = 0;
+            }
             case QuarryData.B_OUTLINE -> {
                 outline = !outline;
                 syncToClients();
@@ -416,12 +425,28 @@ public class SourceQuarryBlockEntity extends BlockEntity implements MenuProvider
         }
         // Cheapest checks first: an idle quarry costs a few field reads per tick.
         if (!linked) {
-            if (!linkTried) link(null);   // placed by a command or structure: try once on its own
+            // Not linked yet (placed before its markers, or by a command): look for a pair every 5 seconds.
+            if (!linkTried || now >= nextMarkerCheck) {
+                nextMarkerCheck = now + 100;
+                link(null);
+            }
+            return;
+        }
+        if (now >= nextMarkerCheck) {
+            nextMarkerCheck = now + 20;
+            checkMarkers(sl);
+        }
+        if (markerMissing) {
+            if (!done) status = Status.MARKER_MOVED;
             return;
         }
         if (done) return;
+        if (!started) {
+            status = Status.STOPPED;
+            return;
+        }
         if (!redstoneAllows()) {
-            status = redstoneMode == RedstoneMode.OFF ? Status.DISABLED : Status.WAITING_REDSTONE;
+            status = Status.WAITING_REDSTONE;
             return;
         }
         if (QuarryConfig.PAUSE_FOR_PLAYERS.get()) {
@@ -484,12 +509,40 @@ public class SourceQuarryBlockEntity extends BlockEntity implements MenuProvider
         status = Status.RUNNING;
     }
 
+    /**
+     * Once a second: are both linked markers still there and paired with each other? Two block-entity
+     * lookups. If not, mining pauses; as soon as a complete pair is in range again (a moved marker pairs
+     * itself with its old partner when placed), the quarry re-links to that area. Up/Down, glyphs,
+     * filters, redstone mode, lock and the Start/Stop state are all kept; mining starts over from the top
+     * layer of the new area. Markers in unloaded chunks are left alone (not counted as moved).
+     */
+    private void checkMarkers(ServerLevel sl) {
+        if (markerA == null || markerB == null) return;
+        if (!sl.isLoaded(markerA) || !sl.isLoaded(markerB)) return;
+        if (sl.getBlockEntity(markerA) instanceof MarkerBlockEntity a && a.validPartner(sl) != null
+                && markerB.equals(a.getPartner())) {
+            if (markerMissing) {   // the same pair came back (e.g. a marker was broken and put back in place)
+                markerMissing = false;
+                setChanged();
+            }
+            return;
+        }
+        BlockPos[] pair = findMarkers(sl, null);
+        if (pair == null) {
+            markerMissing = true;
+            linkError = null;
+            status = done ? Status.DONE : Status.MARKER_MOVED;
+            setChanged();
+            return;
+        }
+        link(null);   // a complete pair again: follow it
+    }
+
     private boolean redstoneAllows() {
         return switch (redstoneMode) {
             case ALWAYS -> true;
             case HIGH -> powered;
             case LOW -> !powered;
-            case OFF -> false;
         };
     }
 
@@ -909,7 +962,7 @@ public class SourceQuarryBlockEntity extends BlockEntity implements MenuProvider
 
     /** Runs once a second while chunk loading is enabled or tickets are still held. */
     private void manageChunks(ServerLevel sl) {
-        boolean want = QuarryConfig.CHUNK_LOADING.get() && linked && !done && redstoneAllows();
+        boolean want = QuarryConfig.CHUNK_LOADING.get() && linked && !done && started && !markerMissing && redstoneAllows();
         if (want) {
             int upkeep = QuarryConfig.CHUNK_LOAD_COST.get();
             if (ensureSource(sl, upkeep)) {
@@ -1119,6 +1172,7 @@ public class SourceQuarryBlockEntity extends BlockEntity implements MenuProvider
             case QuarryData.DOWN -> down;
             case QuarryData.APPLY -> applyKind();
             case QuarryData.REDSTONE -> redstoneMode.ordinal();
+            case QuarryData.STARTED -> started ? 1 : 0;
             case QuarryData.OUTLINE -> outline ? 1 : 0;
             case QuarryData.ESTIMATE -> {
                 long passed = passedPositions();
@@ -1250,6 +1304,8 @@ public class SourceQuarryBlockEntity extends BlockEntity implements MenuProvider
         if (markerA != null) tag.putLong("markerA", markerA.asLong());
         if (markerB != null) tag.putLong("markerB", markerB.asLong());
         tag.putString("redstone", redstoneMode.name());
+        tag.putBoolean("running", started);
+        tag.putBoolean("markerMissing", markerMissing);
         tag.putBoolean("outline", outline);
         if (owner != null) {
             tag.putUUID("owner", owner);
@@ -1303,11 +1359,16 @@ public class SourceQuarryBlockEntity extends BlockEntity implements MenuProvider
         appliedDown = tag.getInt("appliedDown");
         markerA = tag.contains("markerA") ? BlockPos.of(tag.getLong("markerA")) : null;
         markerB = tag.contains("markerB") ? BlockPos.of(tag.getLong("markerB")) : null;
+        // Saves from before 1.4.0 have no Start/Stop state: those quarries keep running, except ones whose
+        // redstone mode was the removed "Off", which load stopped.
+        String mode = tag.getString("redstone");
+        started = tag.contains("running") ? tag.getBoolean("running") : !"OFF".equals(mode);
         try {
-            redstoneMode = RedstoneMode.valueOf(tag.getString("redstone"));
+            redstoneMode = RedstoneMode.valueOf(mode);
         } catch (IllegalArgumentException e) {
             redstoneMode = RedstoneMode.ALWAYS;
         }
+        markerMissing = tag.getBoolean("markerMissing");
         outline = tag.getBoolean("outline");
         owner = tag.hasUUID("owner") ? tag.getUUID("owner") : null;
         ownerName = tag.getString("ownerName");

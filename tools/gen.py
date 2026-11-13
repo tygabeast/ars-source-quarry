@@ -41,7 +41,30 @@ def faces(tex, uv=None, sides=("north", "south", "east", "west", "up", "down")):
     return {s: ({"texture": tex, "uv": uv} if uv else {"texture": tex}) for s in sides}
 
 
+def _default_uv(side, a, b):
+    """The UV Minecraft would pick for a face, shifted back inside 0..16 when the element pokes outside the
+    block. Without this, faces above y=16 or past an edge sample the next texture in the atlas."""
+    x1, y1, z1 = a
+    x2, y2, z2 = b
+    u, v = {"north": ((16 - x2, 16 - x1), (16 - y2, 16 - y1)), "south": ((x1, x2), (16 - y2, 16 - y1)),
+            "west": ((z1, z2), (16 - y2, 16 - y1)), "east": ((16 - z2, 16 - z1), (16 - y2, 16 - y1)),
+            "up": ((x1, x2), (z1, z2)), "down": ((x1, x2), (16 - z2, 16 - z1))}[side]
+
+    def fit(lo, hi):
+        lo, hi = round(lo, 4), round(hi, 4)
+        if lo < 0:
+            lo, hi = 0, hi - lo
+        if hi > 16:
+            lo, hi = lo - (hi - 16), 16
+        return max(0, lo), min(16, hi)
+    (u0, u1), (v0, v1) = fit(*u), fit(*v)
+    return [u0, v0, u1, v1]
+
+
 def el(a, b, f, glow=False, rot=None):
+    for side, face in f.items():
+        if "uv" not in face:
+            face["uv"] = _default_uv(side, a, b)
     e = {"from": a, "to": b, "faces": f}
     if glow:
         e["neoforge_data"] = GLOW
@@ -82,7 +105,7 @@ def quarry_model():
         el([7.25, 4.6, 7.25], [8.75, 6, 8.75], faces("#crystal", [5, 0, 8, 4]), glow=True, rot=r45),
         # gold bowl on top holding a pool of Source
         el([5.5, 16.2, 5.5], [10.5, 17.2, 10.5], faces("#gold")),
-        el([6.5, 16.3, 6.5], [9.5, 17.3, 9.5], faces("#orb", [4, 4, 12, 12], ("up",)), glow=True),
+        el([6.5, 17.2, 6.5], [9.5, 17.25, 9.5], faces("#orb", [4, 4, 12, 12], ("up",)), glow=True),
     ]
     return {"parent": "minecraft:block/block", "ambientocclusion": False,
             "textures": {"particle": f"{MOD}:block/sourcestone_bricks", "top": f"{MOD}:block/quarry_top",
@@ -202,7 +225,8 @@ LANG = {
     f"status.{MOD}.no_output": "No container next to the quarry",
     f"status.{MOD}.output_full": "Output container full",
     f"status.{MOD}.waiting_redstone": "Waiting for redstone",
-    f"status.{MOD}.disabled": "Turned off",
+    f"status.{MOD}.stopped": "Stopped (press Start)",
+    f"status.{MOD}.marker_moved": "A Ley Marker moved: waiting for its pair",
     f"status.{MOD}.player_in_area": "Paused: a player is in the area",
     f"status.{MOD}.waiting_chunk": "Waiting for the area to load",
     f"status.{MOD}.finishing": "Finishing up",
@@ -211,7 +235,6 @@ LANG = {
     f"redstone.{MOD}.always": "Always on (ignores redstone)",
     f"redstone.{MOD}.high": "On with a redstone signal",
     f"redstone.{MOD}.low": "On without a redstone signal",
-    f"redstone.{MOD}.off": "Off",
 
     f"gui.{MOD}.no_markers": "No markers linked",
     f"gui.{MOD}.range": "y %s to %s (%s)",
@@ -237,6 +260,10 @@ LANG = {
     f"gui.{MOD}.tip.progress": "%s%% of the area passed, %s blocks mined",
     f"gui.{MOD}.tip.source": "Source: %s / %s",
     f"gui.{MOD}.tip.estimate": "About %s more Source to finish",
+    f"gui.{MOD}.tip.start": "Start",
+    f"gui.{MOD}.tip.start_desc": "Begin mining. New quarries start stopped, so they do not mine the moment Source arrives.",
+    f"gui.{MOD}.tip.stop": "Stop",
+    f"gui.{MOD}.tip.stop_desc": "Stop mining. Progress and settings are kept.",
     f"gui.{MOD}.tip.cycle": "Click to change, right-click to go back",
     f"gui.{MOD}.tip.outline_on": "Outline shown to nearby players",
     f"gui.{MOD}.tip.outline_off": "Outline hidden (still shown while holding a Ley Marker or Dominion Wand)",
@@ -262,8 +289,8 @@ LANG = {
     f"jade.{MOD}.progress": "%s%% of the area done",
     f"config.jade.plugin_{MOD}.quarry_info": "Source Quarry",
 
-    f"{MOD}.page1.source_quarry": "Mines out an area marked by two Ley Markers, layer by layer from the top, using Source from nearby jars. Items go into a container next to the quarry, fluids into a neighbouring tank or are evaporated. Right-click it to open its controls.",
-    f"{MOD}.page.source_quarry.area": "The markers set the corners; their height is the base level. In the quarry's screen, Up and Down set how many layers to clear above and below it. Digging deeper keeps progress; other changes restart from the top. A redstone mode button and an outline toggle sit beside the progress bars, and a comparator reads the progress.",
+    f"{MOD}.page1.source_quarry": "Mines out an area marked by two Ley Markers, layer by layer from the top, using Source from nearby jars. Items go into a container next to the quarry, fluids into a neighbouring tank or are evaporated. Right-click it to open its controls and press Start.",
+    f"{MOD}.page.source_quarry.area": "The markers set the corners; their height is the base level. In the quarry's screen, Up and Down set how many layers to clear above and below it. Digging deeper keeps progress; other changes restart from the top. If a marker is moved, the quarry pauses and follows the markers once both are placed again, keeping its settings. A Start/Stop button, a redstone mode button and an outline toggle sit beside the progress bars, and a comparator reads the progress.",
     f"{MOD}.page.source_quarry.glyphs": "Glyph slots: Amplify mines more blocks per action, Extract gives Silk Touch, Fortune raises yields, Smelt smelts drops and Crush runs them through crushing recipes. Each one raises the Source cost. The Void slots destroy matching items instead of outputting them; their buttons switch to keeping only matching items, and to matching whole groups by common tags (any ore, any gem).",
     f"{MOD}.page.source_quarry.output": "Only the inside of the boundary is mined: the rows and columns the markers stand on are left in place at every depth. The quarry pauses when its output is full, when a player stands inside the area, and when it runs out of Source. Source Relays linked to the quarry with a Dominion Wand can feed it from afar. A placed quarry is locked to its owner, their team and operators; the door button unlocks it.",
     f"{MOD}.page1.ley_marker": "Place two Ley Markers at opposite corners of the area you want quarried, then place a Source Quarry within 32 blocks of either one. The markers mark the boundary, which is left standing; everything inside it is mined. A new marker pairs with the nearest unpaired marker, so several marked areas can sit side by side. Holding a marker shows paired markers in cyan and unpaired ones in red. Holding a marker or a Dominion Wand shows the markers and the outline of nearby quarry areas.",

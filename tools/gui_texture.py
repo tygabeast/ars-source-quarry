@@ -8,6 +8,7 @@ Sheet layout (256x256); coordinates are shared with SourceQuarryScreen.java and 
   progress fill         (180, 240) 1 x 5     (stretched)
   source fill           (184, 240) 1 x 5     (stretched)
   bedrock icon          (190, 240) 8 x 8
+  start (play) icon     (200, 240) 8 x 8, stop icon at (210, 240)
 """
 from PIL import Image, ImageDraw
 
@@ -27,9 +28,9 @@ SOURCE = [(92, 22, 124), (160, 60, 210), (214, 120, 255)]
 SLOT_GLYPHS = [(130 + i * 18, 31) for i in range(5)]
 SLOT_VOID = [(130 + i * 18, 73) for i in range(6)]
 INV_X, INV_Y, HOTBAR_Y = 43, 140, 198
-PROGRESS = (10, 112, 130, 5)
-SOURCE_BAR = (10, 121, 130, 5)
-ICON_BUTTONS = [(176, 103), (198, 103), (220, 103)]
+PROGRESS = (10, 112, 108, 5)
+SOURCE_BAR = (10, 121, 108, 5)
+ICON_BUTTONS = [(154, 103), (176, 103), (198, 103), (220, 103)]
 VOID_BUTTONS = [(214, 60), (228, 60)]
 APPLY = (10, 80)
 BEDROCK_BTN = (96, 65)
@@ -170,4 +171,11 @@ def sheet():
     for i, w in enumerate((3, 2, 1)):
         d.line([(193 - w + 1, 244 + i), (194 + w - 1, 244 + i)], fill=ic)
     d.line([(190, 247), (197, 247)], fill=GOLD[2] + (255,))
+    # Start: a green play triangle. Stop: a red square. Both with a dark outline so they read on gold.
+    for y in range(8):
+        w = 4 - abs(y - 3.5) if y < 8 else 0
+        for x in range(int(round(w * 1.6)) + 1):
+            d.point((201 + x, 240 + y), fill=(70, 190, 90, 255))
+    d.line([(200, 240), (200, 247)], fill=(30, 80, 40, 255))
+    d.rectangle([211, 241, 216, 246], fill=(200, 60, 60, 255), outline=(90, 24, 24, 255))
     return s

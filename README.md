@@ -18,7 +18,8 @@ By Tygabeast. MIT licence (see `LICENSE`); all textures and models are original.
    from jars (and anything Ars Nouveau treats as a Source provider) by itself; a Source Relay linked to it with
    a Dominion Wand can also push Source in from further away. Nothing can pull Source back out of it.
    A fluid tank next to it (a cauldron works) collects fluids.
-4. Right-click the quarry to open its screen.
+4. Right-click the quarry to open its screen, set Up/Down and glyphs, and press **Start**.
+   Moving a marker later is fine: the quarry pauses, then follows the markers to their new area.
 
 ## The screen
 
@@ -38,7 +39,8 @@ By Tygabeast. MIT licence (see `LICENSE`); all textures and models are original.
     raw ores; one diamond covers all gems). An empty filter never destroys anything.
 - **Status, progress and Source bars.** Hover them for exact numbers, an estimate of the Source still needed,
   and how many blocks were left in place (machines, unbreakable, too hard, or protected by claims).
-- **Redstone mode:** always on, on with a signal, on without a signal, or off. Right-click goes back a mode.
+- **Start/Stop:** new quarries start stopped; press Start to begin. Stopping keeps progress and settings.
+- **Redstone mode:** always on, on with a signal, or on without a signal. Right-click goes back a mode.
 - **Lock** (door icon): a placed quarry is locked to its owner, players on the owner's scoreboard team, and
   operators. The owner or an operator can unlock it for everyone. Quarries placed by commands, or before 1.2.0,
   are unowned until someone presses the lock button.
@@ -89,6 +91,8 @@ loading (off by default) with its upkeep.
 - Glyph effects, the enchanted tool and the void filter are rebuilt only when their slots change; Smelt and
   Crush results are cached per item until recipes reload.
 - The player check walks the level's player list once a second (no entity searches).
+- The moved-marker check runs once a second: two block-entity lookups for the quarry's own markers. The
+  marker search only runs when one has moved (and every 5 seconds for a quarry with no markers yet).
 - Relay input is a plain capability: a relay pushes Source in on its own schedule; the quarry does nothing extra.
 - The owner check runs when the screen is opened and on button presses only.
 - Tag matching builds the filter's tag set once when the filter changes; each drop is then one set lookup per tag.
@@ -107,6 +111,27 @@ loading (off by default) with its upkeep.
 `gradle build`. If Ars Nouveau's Maven is unreachable, put the Ars Nouveau, Curios and GeckoLib jars in `libs/`.
 `python3 tools/gen.py` regenerates all models, textures (including the GUI), recipes, tags, loot tables, lang
 and the logo.
+
+## 1.4.0
+
+- Start/Stop button in the quarry's screen. New quarries start stopped, so they no longer begin mining the
+  moment they get Source; press Start. Quarries already placed keep running after the update.
+- The quarry follows moved Ley Markers. While one of its markers is missing it pauses ("A Ley Marker moved");
+  once a complete pair is in range again it re-links to the new area and starts over from that area's top
+  layer, keeping Up/Down, glyphs, filters, redstone mode, lock and its Start/Stop state. No more breaking and
+  re-placing the quarry. A quarry placed before its markers also links by itself once they are down.
+- Apply & restart is available whenever a marker has moved.
+
+Cleanup:
+- Removed the redstone mode "Off" (Start/Stop replaces it) and its "Turned off" status. Quarries saved with
+  redstone mode Off load stopped, with redstone mode "Always".
+- Removed an unused glyph helper.
+
+## 1.3.6
+
+- Fixed see-through gaps on the sides of the gold bowl on top of the quarry. Faces that stick out past the
+  block's edges (bowl, corner caps, gold feet, cloth edges) sampled the neighbouring texture in the atlas;
+  every face now uses coordinates inside its own texture. The Source pool now sits flush on the bowl.
 
 ## 1.3.5
 
